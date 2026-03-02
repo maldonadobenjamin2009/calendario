@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Creador de Calendarios & Carátulas Studio Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- FUENTES INCLUIDAS -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&family=Oswald:wght@400;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --color-base: #4a90e2; --color-secundario: #0b2242;
+            --bg-dias: 255, 255, 255; --bg-findes: 200, 200, 200;
+            --border-dias: #ffffff; --opacidad-dias: 0.6; --opacidad-findes: 0.6;
+            --color-texto: #111111; 
+            --font-main: 'Open Sans', sans-serif; --font-title: 'Oswald', sans-serif;
+            --ui-bg: #f4f7f6; --ui-border: #ccc;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2b2b2b; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* ================= PANALES LATERALES ================= */
+        #left-sidebar, #right-sidebar {
+            width: 340px; min-width: 340px; background: var(--ui-bg); padding: 20px; box-sizing: border-box;
+            overflow-y: auto; display: flex; flex-direction: column; gap: 12px; z-index: 10;
+        }
+        #left-sidebar { box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        #right-sidebar { background: #2c2c36; color: #eee; box-shadow: -2px 0 10px rgba(0,0,0,0.5); }
+        
+        .sidebar-tabs { display: flex; width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 5px; border: 1px solid var(--ui-border); box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        .tab-btn { flex: 1; padding: 10px 0; background: #e0e0e0; color: #555; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.9em; }
+        .tab-btn:hover { background: #d0d0d0; }
+        .tab-btn.active { background: #2196F3; color: white; }
+        .tab-content { display: none; flex-direction: column; gap: 12px; }
+        .tab-content.active { display: flex; }
+
+        h2 { margin-top: 0; text-align: center; font-size: 1.2em; border-bottom: 2px solid #ddd; padding-bottom: 10px; color: #222;}
+        #right-sidebar h2 { color: #eee; border-bottom-color: #444; }
+
+        .control-group { background: white; padding: 12px; border-radius: 6px; border: 1px solid var(--ui-border); display: flex; flex-direction: column; gap: 8px; }
+        .control-group label { font-weight: bold; font-size: 0.85em; color: #555; }
+        input, select, textarea, button { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; }
+        input[type="color"] { padding: 0; height: 30px; width: 100%; cursor: pointer; border: none; }
+        input[type="range"] { cursor: pointer; }
+        optgroup { font-weight: bold; color: #222; }
+        
+        .flex-row { display: flex; gap: 10px; }
+        .flex-row > * { flex: 1; display: flex; flex-direction: column; }
+
+        button { background: #4CAF50; color: white; font-weight: bold; border: none; cursor: pointer; transition: 0.2s;}
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+        .btn-blue { background: #2196F3; } .btn-red { background: #e91e63; } .btn-dark { background: #333; } .btn-orange { background: #ff9800; }
+
+        #paleta { display: flex; gap: 5px; height: 30px; border-radius: 4px; overflow: hidden; border: 1px solid #ccc; background: #eee; align-items: center; justify-content: center;}
+        .color-swatch { flex: 1; cursor: pointer; transition: 0.2s; height: 100%;}
+        .color-swatch:hover { transform: scale(1.1); box-shadow: 0 0.5px 5px rgba(0,0,0,0.5); z-index: 2; position: relative;}
+
+        /* ================= ÁREA DE TRABAJO (CENTRO) ================= */
+        #center-workspace { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        #month-carousel-container {
+            height: 100px; background: #1a1a1a; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 5;
+        }
+        #year-selector { background: transparent; color: white; border: 1px solid #555; font-size: 1.2em; font-weight: bold; width: 80px; margin-right: 20px;}
+        .carousel-track { display: flex; gap: 15px; overflow-x: auto; scroll-behavior: smooth; flex-grow: 1; padding: 15px 0; align-items: center;}
+        .carousel-track::-webkit-scrollbar { height: 6px; } .carousel-track::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        
+        .month-item { color: #888; font-size: 1.1em; font-weight: bold; cursor: pointer; padding: 10px 20px; border-radius: 20px; transition: all 0.3s; white-space: nowrap; border: 2px solid transparent;}
+        .month-item:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .month-item.active { color: #fff; background: rgba(33, 150, 243, 0.2); border-color: #2196F3; transform: scale(1.3); text-shadow: 0 0 10px rgba(33,150,243,0.8); margin: 0 15px;}
+
+        #preview-area {
+            flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 40px; overflow: auto;
+            background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+            background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        #calendario-contenedor {
+            width: 100%; max-width: 1100px; height: auto; aspect-ratio: 16 / 9; container-type: inline-size;
+            background-color: #222; background-size: cover; background-position: 50% 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            background-repeat: no-repeat;
+            display: flex; flex-direction: column; overflow: hidden; font-family: var(--font-main); box-sizing: border-box; position: relative;
+        }
+
+        /* ================= GRID Y CELDAS ================= */
+        .cuadricula { 
+            display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; height: 100%; flex-grow: 1; 
+            box-sizing: border-box; position: relative; z-index: 50; 
+        }
+        #header-clasico, #titulo-mes-moderno { position: relative; z-index: 50; pointer-events: none;}
+        
+        .dia-celda { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; pointer-events: auto; box-sizing: border-box; }
+        .dia-numero { font-weight: bold; }
+        .notas { flex-grow: 1; width: 100%; height: 100%; min-height: 0; border: none; background: transparent; resize: none; outline: none; font-family: inherit; position: relative; z-index: 51; box-sizing: border-box; padding: 0; margin: 0; }
+
+        /* ================= STICKERS Y CAPAS ================= */
+        .sticker-wrapper { position: absolute; cursor: move; display: flex; justify-content: center; align-items: center; z-index: 60;}
+        .sticker-inner { width: 100%; height: 100%; position: relative; }
+        .sticker-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block; filter: none; }
+        .sticker-wrapper.active { outline: 2px dashed rgba(255,255,255,0.8); }
+        .sticker-wrapper.active::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.05); pointer-events: none;}
+        .transform-controls { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .sticker-wrapper.active .transform-controls { display: block; }
+        .resize-handle { position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; background: #2196F3; border: 2px solid #fff; border-radius: 50%; cursor: se-resize; pointer-events: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .rotate-handle { position: absolute; top: -30px; left: calc(50% - 8px); width: 16px; height: 16px; background: #ff9800; border: 2px solid #fff; border-radius: 50%; cursor: crosshair; pointer-events: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .rotate-line { position: absolute; top: -14px; left: calc(50% - 1px); width: 2px; height: 14px; background: #fff; pointer-events: none; }
+
+        #layer-stack { display: flex; flex-direction: column; gap: 5px; background: #1e1e24; padding: 5px; border-radius: 6px; border: 1px solid #111;}
+        .layer-item { display: flex; align-items: center; background: #3a3a46; padding: 8px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+        .layer-item.active { background: #4a5a76; border-color: #6a8ab6; }
+        .layer-item.grid-layer { background: #223; cursor: default; font-style: italic; color: #88a; justify-content: center; font-size: 0.85em; }
+        .layer-thumb { width: 30px; height: 30px; background: #222; border-radius: 4px; object-fit: contain; margin-right: 10px; font-family: 'Noto Color Emoji', sans-serif; display: flex; align-items: center; justify-content: center; font-size: 20px;}
+        .layer-name { flex-grow: 1; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .layer-actions { display: flex; gap: 5px; }
+        .layer-btn { background: #222; border: none; color: #bbb; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display:flex; align-items:center; justify-content:center;}
+        .layer-btn:hover { background: #555; color: white;} .layer-btn.delete:hover { background: #e91e63; }
+
+        .layer-properties { background: #3a3a46; padding: 12px; border-radius: 6px; display: none; flex-direction: column; gap: 10px; border: 1px solid #555;}
+        .layer-properties.visible { display: flex; }
+        .layer-properties label { font-size: 0.8em; color: #ccc; }
+        .layer-properties input[type=range] { width: 100%; }
+
+        /* ================= MODO CARÁTULA ================= */
+        #caratula-container { display: none; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; z-index: 50; padding: 5cqi; box-sizing: border-box; position: relative; }
+        
+        .modo-caratula { padding: 5cqi !important; }
+        .modo-caratula #caratula-container { display: flex; }
+        .modo-caratula .cuadricula, .modo-caratula #header-clasico, .modo-caratula #lineal-container, .modo-caratula #titulo-mes-moderno, .modo-caratula #escritorio-header, .modo-caratula #escritorio-footer, .modo-caratula #escritorio-bg { display: none !important; }
+
+        .cara-materia { font-family: var(--font-title); font-size: 14cqi; font-weight: bold; color: var(--color-texto); text-align: center; line-height: 1.1; margin-bottom: 3cqi; text-shadow: 0.3cqi 0.3cqi 0.8cqi rgba(0,0,0,0.6); text-transform: uppercase; }
+        .cara-datos { background: rgba(var(--bg-dias), var(--opacidad-dias)); padding: 2cqi 4cqi; border-radius: 2cqi; border: 0.3cqi solid var(--border-dias); display: flex; flex-direction: column; gap: 1cqi; align-items: center; box-shadow: 0 1cqi 2cqi rgba(0,0,0,0.5); min-width: 40%; }
+        .cara-linea { font-family: var(--font-main); font-size: 3.5cqi; color: var(--color-texto); font-weight: bold; }
+
+        /* ================= TEMA MODERNO ================= */
+        .tema-moderno { padding: 4cqi; }
+        .tema-moderno #header-clasico, .tema-moderno #lineal-container, .tema-moderno #escritorio-bg, .tema-moderno #escritorio-header, .tema-moderno #escritorio-footer { display: none !important; }
+        .tema-moderno #titulo-mes-moderno { text-align: center; color: var(--color-texto); text-shadow: 0.3cqi 0.3cqi 0.8cqi rgba(0,0,0,0.9); font-size: 5cqi; margin: 0 0 2cqi 0; font-family: var(--font-title); font-weight: bold; }
+        .tema-moderno .cuadricula { gap: 1cqi; flex-grow: 1; }
+        .tema-moderno .dia-nombre { background: rgba(0,0,0,0.8); color: white; text-align: center; padding: 1cqi 0; font-weight: bold; border-radius: 0.5cqi; font-size: 1.5cqi; display: flex; align-items: center; justify-content: center; }
+        .tema-moderno .dia-celda { border: 0.2cqi solid var(--border-dias); border-radius: 0.8cqi; padding: 0.8cqi; gap: 0.5cqi; box-shadow: 0 0.4cqi 0.8cqi rgba(0,0,0,0.4); }
+        .tema-moderno .dia-celda.normal { background: rgba(var(--bg-dias), var(--opacidad-dias)); }
+        .tema-moderno .dia-celda.finde { background: rgba(var(--bg-findes), var(--opacidad-findes)); }
+        .tema-moderno .dia-celda.vacia textarea { display: none; }
+        .tema-moderno .dia-numero { font-size: 2cqi; color: var(--color-texto); text-shadow: 0.1cqi 0.1cqi 0.3cqi rgba(0,0,0,0.4); }
+        .tema-moderno .notas { color: var(--color-texto); text-shadow: 0.1cqi 0.1cqi 0.2cqi rgba(0,0,0,0.4); font-size: 1.2cqi; line-height: 1.2;}
+        .tema-moderno .notas::placeholder { color: var(--color-texto); opacity: 0.6; }
+
+        /* ================= TEMA CLASICO ================= */
+        .tema-clasico { padding: 0; justify-content: space-between; }
+        .tema-clasico #titulo-mes-moderno, .tema-clasico #lineal-container, .tema-clasico #escritorio-bg, .tema-clasico #escritorio-header, .tema-clasico #escritorio-footer { display: none !important; }
+        .tema-clasico #header-clasico { flex-grow: 1; width: calc(100% * 2 / 7); display: flex; flex-direction: column; justify-content: flex-end; padding: 0 0 2cqi 1.5cqi; box-sizing: border-box; font-family: var(--font-title); }
+        .hc-bloque-fecha { width: 65%; display: flex; flex-direction: column; margin-bottom: 1.5cqi; }
+        #hc-num { background: var(--color-secundario); color: white; font-size: 9cqi; text-align: center; font-weight: 900; line-height: 1; padding: 1cqi 0;}
+        #hc-mes, #hc-anio { background: white; color: var(--color-secundario); font-size: 2.2cqi; text-align: center; font-weight: bold; padding: 0.3cqi 0;}
+        #hc-anio { background: var(--color-secundario); color: white; }
+        #hc-logo { font-size: 2.2cqi; font-weight: 900; line-height: 1.1; margin-bottom: 0.5cqi; color: var(--color-secundario); text-shadow: -0.1cqi -0.1cqi 0 white, 0.1cqi -0.1cqi 0 white, -0.1cqi 0.1cqi 0 white, 0.1cqi 0.1cqi 0 white; }
+        #hc-char { font-size: 3.5cqi; font-weight: 900; color: white; text-transform: uppercase; text-shadow: 0.3cqi 0.3cqi 0 rgba(0,0,0,0.6); }
+
+        .tema-clasico .cuadricula { flex-grow: 0; height: 60%; border-top: 0.2cqi solid var(--border-dias); border-left: 0.2cqi solid var(--border-dias); }
+        .tema-clasico .dia-nombre { text-align: center; padding: 0.5cqi 0; font-weight: bold; font-size: 1.5cqi; color: white; display: flex; align-items: center; justify-content: center; border-bottom: 0.4cqi solid var(--border-dias); border-right: 0.2cqi solid var(--border-dias); }
+        .tema-clasico .dia-nombre.dom { background: #d32f2f; } .tema-clasico .dia-nombre.sab { background: #1976d2; } .tema-clasico .dia-nombre.normal { background: #757575; }
+        .tema-clasico .dia-celda { border-right: 0.2cqi solid var(--border-dias); border-bottom: 0.2cqi solid var(--border-dias); padding: 0.5cqi; gap: 0.2cqi; }
+        .tema-clasico .dia-celda.normal { background: rgba(var(--bg-dias), var(--opacidad-dias)); }
+        .tema-clasico .dia-celda.finde { background: rgba(var(--bg-findes), var(--opacidad-findes)); }
+        .tema-clasico .dia-numero { font-size: 1.8cqi; text-shadow: none; }
+        .tema-clasico .dia-celda.dom .dia-numero { color: #d32f2f; } .tema-clasico .dia-celda.sab .dia-numero { color: #1976d2; } .tema-clasico .dia-celda.normal .dia-numero { color: var(--color-texto); }
+        .tema-clasico .notas { color: var(--color-texto); font-size: 1.2cqi; font-weight: 600; }
+        .tema-clasico .notas::placeholder { color: var(--color-texto); opacity: 0.5; }
+
+        /* ================= TEMA LINEAL ================= */
+        .tema-lineal { padding: 0; justify-content: flex-end; }
+        .tema-lineal #titulo-mes-moderno, .tema-lineal #header-clasico, .tema-lineal .cuadricula, .tema-lineal #escritorio-bg, .tema-lineal #escritorio-header, .tema-lineal #escritorio-footer { display: none !important; }
+        #lineal-container { display: none; width: 100%; background: white; align-items: center; padding: 1.5cqi 3cqi; box-sizing: border-box; box-shadow: 0 -0.5cqi 2cqi rgba(0,0,0,0.5); z-index: 50;}
+        .tema-lineal #lineal-container { display: flex; }
+        #lc-left { display: flex; flex-direction: column; align-items: center; padding-right: 3cqi; margin-right: 3cqi; border-right: 0.2cqi solid var(--color-secundario); }
+        #lc-month { font-family: var(--font-title); font-size: 6cqi; font-weight: 700; color: var(--color-secundario); line-height: 1; }
+        #lc-year { font-family: var(--font-title); font-size: 1.8cqi; font-weight: 700; color: var(--color-secundario); line-height: 1; }
+        #lc-days { display: flex; flex-grow: 1; justify-content: space-between; align-items: baseline; font-family: var(--font-main); }
+        #lc-days span { font-size: 2.2cqi; font-weight: 700; }
+        #lc-days span.normal { color: var(--color-texto); }
+        #lc-days span.sabado { color: #1976d2; }
+        #lc-days span.domingo { color: #d32f2f; }
+        #lc-copy { font-size: 1.2cqi; color: #888; margin-left: 2cqi; align-self: flex-end; padding-bottom: 0.2cqi; font-weight: bold;}
+
+        /* ================= TEMA ESCRITORIO ================= */
+        .tema-escritorio { display: flex; flex-direction: column; padding: 4cqi 4cqi 4cqi 50%; box-sizing: border-box; justify-content: space-between;}
+        .tema-escritorio #titulo-mes-moderno, .tema-escritorio #header-clasico, .tema-escritorio #lineal-container { display: none !important; }
+        
+        #escritorio-bg { display: none; position: absolute; top: 0; right: 0; bottom: 0; width: 50%; background: #ffffff; z-index: 10; box-shadow: -1cqi 0 3cqi rgba(0,0,0,0.3); }
+        .tema-escritorio #escritorio-bg { display: block; }
+
+        #escritorio-header, #escritorio-footer { display: none; z-index: 20; position: relative;}
+        
+        .tema-escritorio #escritorio-header { display: flex; justify-content: center; font-family: var(--font-title); font-size: 5.5cqi; color: var(--color-findes); margin-bottom: 2cqi; border-bottom: 0.2cqi solid #eee; padding-bottom: 1cqi;}
+        .tema-escritorio #escritorio-footer { display: flex; justify-content: space-between; gap: 4cqi; margin-top: auto;}
+
+        .tema-escritorio .cuadricula { z-index: 20; flex: 1 1 auto; min-height: 0; margin-bottom: 2cqi; gap: 0.8cqi; }
+        .tema-escritorio .dia-celda { background: transparent !important; border: none !important; box-shadow: none !important; align-items: center; justify-content: center; padding: 0.5cqi; overflow: visible; }
+        .tema-escritorio .dia-numero { font-size: 4cqi; color: var(--color-texto); text-shadow: none; }
+        .tema-escritorio .finde .dia-numero { color: var(--color-findes); font-weight: 900;} 
+        .tema-escritorio .dia-nombre { background: transparent; color: var(--color-secundario); font-size: 2.2cqi; border-bottom: 0.2cqi solid var(--color-secundario); padding-bottom: 0.8cqi; margin-bottom: 0.5cqi; border-radius: 0; }
+        .tema-escritorio .notas { display: none; }
+
+        .mini-grid-container { flex: 1; display: flex; flex-direction: column; }
+        .mini-title { color: var(--color-secundario); font-size: 2.2cqi; font-weight: bold; text-align: center; margin-bottom: 1cqi; text-transform: uppercase; font-family: var(--font-title);}
+        .mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5cqi; text-align: center; font-size: 1.8cqi; color: var(--color-texto); font-weight: bold; font-family: var(--font-main);}
+        .mini-grid .mg-header { color: var(--color-secundario); border-bottom: 0.2cqi solid var(--color-secundario); margin-bottom: 0.5cqi; padding-bottom: 0.3cqi; font-size: 1.6cqi;}
+        .mini-grid .mg-dom, .mini-grid .mg-sab { color: var(--color-findes); font-weight: 900;}
+
+
+        /* ================= ADAPTACIÓN MÓVIL / VERTICAL ================= */
+        
+        .modo-vertical.tema-moderno { padding: 4cqi; }
+        .modo-vertical.tema-moderno #titulo-mes-moderno { font-size: 8cqi; margin-bottom: 2.5cqi; margin-top: auto; }
+        .modo-vertical.tema-moderno .cuadricula { flex-grow: 0; height: 70%; gap: 0.8cqi; } 
+
+        .modo-vertical.tema-clasico #header-clasico { width: 50%; padding-bottom: 4cqi;}
+        .modo-vertical.tema-clasico .cuadricula { height: 45%; }
+        
+        .modo-vertical.tema-escritorio { padding: 50cqi 5cqi 1cqi 5cqi !important; display: flex !important; flex-direction: column !important; justify-content: flex-start !important; }
+        .modo-vertical.tema-escritorio #escritorio-bg { width: 100% !important; height: 50% !important; top: 50% !important; left: 0 !important; border-top: 0.3cqi solid #eee !important; background: #fff !important; }
+        .modo-vertical.tema-escritorio #escritorio-header { display: flex !important; position: relative; z-index: 60; font-size: 5cqi !important; margin: 0 !important; height: 6cqi !important; align-items: center !important; justify-content: center !important; }
+        .modo-vertical.tema-escritorio .cuadricula { display: grid !important; position: relative; z-index: 60; height: 20cqi !important; margin: 1cqi 0 !important; gap: 0 !important; }
+        .modo-vertical.tema-escritorio .dia-nombre { font-size: 1.5cqi !important; height: 2cqi !important; border-bottom: 0.2cqi solid var(--color-secundario) !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .modo-vertical.tema-escritorio .dia-numero { font-size: 3.2cqi !important; line-height: 1 !important; }
+        .modo-vertical.tema-escritorio #escritorio-footer { display: flex !important; position: relative; z-index: 60; height: 12cqi !important; margin-top: 0 !important; padding-top: 1cqi; gap: 4cqi !important; border-top: 1px solid #f0f0f0; }
+        .modo-vertical .mini-grid-container { flex: 1 !important; }
+        .modo-vertical .mini-title { font-size: 1.5cqi !important; margin-bottom: 0.2cqi !important; }
+        .modo-vertical .mini-grid { font-size: 1.2cqi !important; gap: 0.1cqi !important; }
+
+        /* ================= PANEL DE EMOJIS ================= */
+        .emoji-picker { display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid var(--ui-border); border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; padding: 5px; grid-template-columns: repeat(auto-fill, minmax(35px, 1fr)); gap: 5px; margin-top: 5px; box-sizing: border-box; }
+        .emoji-picker.visible { display: grid; }
+        .emoji-option { cursor: pointer; font-size: 1.5em; text-align: center; padding: 5px; border-radius: 4px; transition: background 0.2s; font-family: 'Noto Color Emoji', sans-serif; color: #000; }
+        .emoji-option:hover { background: #e0e0e0; }
+    </style>
+</head>
+<body>
+
+    <div id="left-sidebar">
+        <!-- SISTEMA DE PESTAÑAS -->
+        <div class="sidebar-tabs">
+            <button class="tab-btn active" id="btn-tab-general" onclick="switchTab('general')">⚙️ General</button>
+            <button class="tab-btn" id="btn-tab-colores" onclick="switchTab('colores')">🎨 Colores</button>
+        </div>
+        
+        <!-- PESTAÑA: GENERAL -->
+        <div id="tab-general" class="tab-content active">
+            
+            <div class="control-group">
+                <label>Modo de Diseño</label>
+                <select id="tipo-diseno" onchange="cambiarTipoDiseno()">
+                    <option value="calendario">📅 Calendario Mensual</option>
+                    <option value="caratula">📓 Carátula de Materia</option>
+                </select>
+
+                <label>Formato y Tamaño (Impresión)</label>
+                <select id="tamano-papel" onchange="actualizarProporcionPapel()">
+                    <optgroup label="Auto / Original">
+                        <option value="auto">Automático (Igual al fondo)</option>
+                    </optgroup>
+                    <optgroup label="Carpetas Escolares">
+                        <option value="rivadavia-v">Rivadavia Vertical (190x240 mm)</option>
+                        <option value="rivadavia-h">Rivadavia Horizontal (240x190 mm)</option>
+                    </optgroup>
+                    <optgroup label="Formatos A">
+                        <option value="a4-h">A4 Horizontal (297x210 mm)</option>
+                        <option value="a4-v">A4 Vertical (210x297 mm)</option>
+                        <option value="a3-h">A3 Horizontal</option>
+                        <option value="a3-v">A3 Vertical</option>
+                        <option value="a5-h">A5 Horizontal (Mitad de A4)</option>
+                        <option value="a5-v">A5 Vertical (Mitad de A4)</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Grupo Específico de Calendario -->
+            <div id="grupo-calendario-opts" class="control-group" style="margin-top:0;">
+                <label>Primer Día de la Semana</label>
+                <select id="inicio-semana" onchange="actualizarInicioSemana()">
+                    <option value="1" selected>Lunes a Domingo (Recomendado)</option>
+                    <option value="0">Domingo a Sábado</option>
+                    <option value="6">Sábado a Viernes</option>
+                </select>
+
+                <label>Estilo del Calendario</label>
+                <select id="estilo-calendario" onchange="cambiarEstiloUI(true, true)">
+                    <option value="moderno">Moderno (Recuadros Sueltos)</option>
+                    <option value="clasico">Clásico (Cuadrícula Sonic Channel)</option>
+                    <option value="lineal">Lineal (Franja Inferior)</option>
+                    <option value="escritorio">Escritorio (Mitad Imagen / Mitad Grid)</option>
+                </select>
+            </div>
+
+            <!-- Grupo Específico de Carátula -->
+            <div id="grupo-caratula-opts" class="control-group" style="display:none; margin-top:0;">
+                <label>Materia</label>
+                <input type="text" id="cara-input-materia" value="MATEMÁTICA" oninput="actualizarTextosCaratula()">
+                
+                <label>Nombre del Alumno (Opcional)</label>
+                <input type="text" id="cara-input-nombre" placeholder="Ej: Juan Pérez" oninput="actualizarTextosCaratula()">
+                
+                <label>Curso / Año (Opcional)</label>
+                <input type="text" id="cara-input-curso" placeholder="Ej: 3ro B" oninput="actualizarTextosCaratula()">
+            </div>
+
+            <!-- Imagen de fondo (Compartido en ambos) -->
+            <div class="control-group">
+                <label>Imagen de Fondo Base</label>
+                <input type="file" id="imagen-fondo" accept="image/*">
+                
+                <div id="grupo-bg-pos" style="display:none; flex-direction:column; gap:8px; margin-top:10px; border-top: 1px solid #eee; padding-top: 8px;">
+                    <label style="font-size: 0.9em; margin-bottom: 2px;">Ajustar Imagen (Modo Escritorio)</label>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size:0.75em; color:#777;">↔ Mover Horizontal (X)</span>
+                        <input type="range" id="bg-pos-x" min="-200" max="300" value="50" oninput="actualizarBgPos()">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size:0.75em; color:#777;">↕ Mover Vertical (Y)</span>
+                        <input type="range" id="bg-pos-y" min="-200" max="300" value="50" oninput="actualizarBgPos()">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size:0.75em; color:#777;">🔍 Tamaño de Imagen (Zoom %)</span>
+                        <input type="range" id="bg-zoom" min="10" max="500" value="100" oninput="actualizarBgPos()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grupo Textos Extra (Solo Clásico) -->
+            <div class="control-group" id="grupo-textos-extra" style="display:none;">
+                <label>Texto Superior (URL/Logo)</label>
+                <textarea id="texto-logo" rows="2" oninput="actualizarTextos()">SONIC&#10;CHANNEL</textarea>
+                <label>Nombre del Personaje</label>
+                <input type="text" id="texto-personaje" value="METAL SONIC" oninput="actualizarTextos()">
+            </div>
+        </div>
+
+        <!-- PESTAÑA: COLORES -->
+        <div id="tab-colores" class="tab-content">
+            <div class="control-group">
+                <label>Paleta del Fondo (Permanente)</label>
+                <div id="paleta"><span style="color:#888; font-size:0.85em; padding: 5px;">Sube un fondo para extraer paleta...</span></div>
+            </div>
+
+            <div class="control-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="margin: 0;">Ajustes Manuales</label>
+                    <button id="btn-undo-color" onclick="undoColor()" class="layer-btn" style="background: #4a5a76; font-size: 0.8em; padding: 4px 8px; color:#fff;" disabled>↶ Deshacer</button>
+                </div>
+                <div class="flex-row">
+                    <div><label>Días / Caja</label><input type="color" id="color-dias" value="#569cd6" onmousedown="saveColorState()" oninput="actualizarColores()"></div>
+                    <div><label>Finde</label><input type="color" id="color-findes" value="#1c4e80" onmousedown="saveColorState()" oninput="actualizarColores()"></div>
+                    <div><label>Texto</label><input type="color" id="color-texto" value="#111111" onmousedown="saveColorState()" oninput="actualizarColores()"></div>
+                    <div><label>Bordes</label><input type="color" id="color-bordes" value="#ffffff" onmousedown="saveColorState()" oninput="actualizarColores()"></div>
+                </div>
+                <label style="margin-top:5px;">Opacidad (Cuadrícula / Cajas):</label>
+                <input type="range" id="op-dias" min="0" max="1" step="0.05" value="0.6" onmousedown="saveColorState()" oninput="actualizarColores()">
+            </div>
+        </div>
+
+        <!-- BOTONES DE EXPORTACIÓN -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
+            <div style="display: flex; gap: 5px;">
+                <button onclick="guardarMesEnZip()" class="btn-blue" style="flex:1" title="Añade imagen al ZIP">➕ a ZIP</button>
+                <button onclick="guardarMesEnPDF()" class="btn-orange" style="flex:1" title="Añade hoja al PDF">➕ a PDF</button>
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <button onclick="descargarZip()" class="btn-dark" style="flex:1">📦 Bajar ZIP</button>
+                <button onclick="descargarPDF()" class="btn-red" style="flex:1">📄 Bajar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="center-workspace">
+        <div id="month-carousel-container">
+            <input type="number" id="anio" value="2026" oninput="actualizarMesDesdeCarrusel()">
+            <div class="carousel-track" id="month-carousel"></div>
+        </div>
+
+        <div id="preview-area">
+            <div id="calendario-contenedor" class="tema-moderno">
+                
+                <!-- Fondo Blanco Fijo para Estilo Escritorio -->
+                <div id="escritorio-bg"></div>
+
+                <!-- ======= MODO CARÁTULA ======= -->
+                <div id="caratula-container">
+                    <div class="cara-materia" id="cara-render-materia">MATEMÁTICA</div>
+                    <div class="cara-datos" id="cara-render-datos" style="display:none;">
+                        <div class="cara-linea" id="cara-render-nombre"></div>
+                        <div class="cara-linea" id="cara-render-curso"></div>
+                    </div>
+                </div>
+
+                <!-- ======= MODO CALENDARIO ======= -->
+                <!-- Cabeceras Tema Escritorio -->
+                <div id="escritorio-header"><span id="eh-texto">OCTUBRE 2026</span></div>
+
+                <!-- Título Tema Moderno -->
+                <h1 id="titulo-mes-moderno">Marzo 2026</h1>
+                
+                <!-- Header Tema Clásico -->
+                <div id="header-clasico">
+                    <div class="hc-bloque-fecha">
+                        <div id="hc-num">12</div>
+                        <div id="hc-mes">December</div>
+                        <div id="hc-anio">2019</div>
+                    </div>
+                    <div id="hc-logo">SONIC<br>CHANNEL</div>
+                    <div id="hc-char">METAL SONIC</div>
+                </div>
+
+                <!-- Cuadrícula Principal (Compartida) -->
+                <div class="cuadricula" id="cuadricula-dias"></div>
+                
+                <!-- Tema Lineal -->
+                <div id="lineal-container">
+                    <div id="lc-left">
+                        <div id="lc-month">1</div>
+                        <div id="lc-year">2026</div>
+                    </div>
+                    <div id="lc-days"></div>
+                    <div id="lc-copy">©SEGA</div>
+                </div>
+
+                <!-- Footer Tema Escritorio (Mini calendarios) -->
+                <div id="escritorio-footer">
+                    <div class="mini-grid-container">
+                        <div class="mini-title" id="mini-prev-title">SEPTIEMBRE 2026</div>
+                        <div class="mini-grid" id="mini-prev"></div>
+                    </div>
+                    <div class="mini-grid-container">
+                        <div class="mini-title" id="mini-next-title">NOVIEMBRE 2026</div>
+                        <div class="mini-grid" id="mini-next"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <div id="right-sidebar">
+        <h2>Añadir Elementos</h2>
+        
+        <div class="control-group">
+            <button class="btn-blue" onclick="document.getElementById('add-sticker-input').click()">🖼️ Subir Imagen (PNG/WebP)</button>
+            <input type="file" id="add-sticker-input" accept="image/png, image/webp" style="display:none;">
+            
+            <hr style="border: 0; border-top: 1px solid #ddd; margin: 4px 0;">
+            
+            <div style="display: flex; gap: 5px; position: relative;">
+                <input type="text" id="emoji-input" placeholder="🌟 Pega un Emoji" style="flex:1; font-family: 'Noto Color Emoji', sans-serif; font-size: 1.2em; text-align: center;">
+                <div id="emoji-picker" class="emoji-picker"></div>
+                <button class="btn-orange" onclick="addEmojiSticker()">➕ Emoji</button>
+            </div>
+        </div>
+
+        <h2 style="margin-top: 15px;">Capas</h2>
+        <div id="layer-stack"></div>
+
+        <div class="layer-properties" id="layer-props">
+            <label style="color:white; font-weight:bold; border-bottom: 1px solid #555; padding-bottom:5px;">Propiedades de Capa</label>
+            <div class="flex-row">
+                <button class="layer-btn" onclick="toggleStickerFlip('flipH')" style="background:#555;">↔ Volteo H</button>
+                <button class="layer-btn" onclick="toggleStickerFlip('flipV')" style="background:#555;">↕ Volteo V</button>
+            </div>
+            <label>Borde Blanco Perimetral (Sólido)</label>
+            <input type="range" id="prop-border" min="0" max="60" value="0" oninput="updateActiveSticker('border', this.value)">
+            
+            <label>Transparencia</label>
+            <input type="range" id="prop-opac" min="0" max="1" step="0.05" value="1" oninput="updateActiveSticker('opacity', this.value)">
+            
+            <button class="layer-btn" onclick="quitarMarcaAgua()" style="background:#e91e63; margin-top: 5px;">🪄 Intentar Borrar Marca de Agua</button>
+        </div>
+    </div>
+
+    <img id="imagen-oculta" style="display:none;" crossorigin="anonymous">
+
+<script>
+    const meses =["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const mesesIngles =["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    let zip = new JSZip(); let pdfInstance = null; let pdfPageCount = 0; const { jsPDF } = window.jspdf;
+    let colorThief = new ColorThief(); 
+    
+    let originalImageRatio = null;
+    let currentMes = -1;
+    let isInitialized = false;
+
+    // BLOQUEO ANTIFILTRACIONES: Esta variable evita que el sistema sobreescriba configuraciones 
+    // de un mes a otro mientras se están inyectando los datos guardados de memoria al DOM.
+    let isLoadingMonth = false; 
+
+    // ESTRUCTURA DE MESES TOTALMENTE INDEPENDIENTES
+    let monthStates = Array(12).fill(null).map(() => ({
+        anio: new Date().getFullYear(),
+        tipoDiseno: 'calendario',
+        caratulaMateria: 'MATEMÁTICA',
+        caratulaNombre: '',
+        caratulaCurso: '',
+        tamanoPapel: 'auto',
+        originalRatio: null,
+        bgUrl: '', bgPosX: '50', bgPosY: '50', bgZoom: '100', inicioSemana: '1',
+        colorDias: '#569cd6', colorFindes: '#1c4e80', colorBordes: '#ffffff', colorTexto: '#111111', opacidad: '0.6',
+        estilo: 'moderno', textoLogo: 'SONIC\nCHANNEL', textoPersonaje: 'METAL SONIC',
+        layers: [], notas:[], paletaColors:[]
+    }));
+    
+    let layers =[]; 
+    let activeLayerId = null; const Z_GRID = 50;
+    
+    let colorHistory =[];
+    let currentPalette =[]; 
+
+    const formatosPapel = {
+        "auto": null,
+        "rivadavia-v": { ratio: 190/240, pdfFormat: [190, 240], pdfOri: 'p' },
+        "rivadavia-h": { ratio: 240/190, pdfFormat: [240, 190], pdfOri: 'l' },
+        "a4-h": { ratio: 297/210, pdfFormat: 'a4', pdfOri: 'l' },
+        "a4-v": { ratio: 210/297, pdfFormat: 'a4', pdfOri: 'p' },
+        "a3-h": { ratio: 420/297, pdfFormat: 'a3', pdfOri: 'l' },
+        "a3-v": { ratio: 297/420, pdfFormat: 'a3', pdfOri: 'p' },
+        "a5-h": { ratio: 210/148, pdfFormat: 'a5', pdfOri: 'l' },
+        "a5-v": { ratio: 148/210, pdfFormat: 'a5', pdfOri: 'p' }
+    };
+
+    const carouselTrack = document.getElementById('month-carousel');
+    meses.forEach((m, i) => {
+        let div = document.createElement('div'); div.className = 'month-item'; div.id = `month-btn-${i}`; div.innerText = m;
+        div.onclick = () => seleccionarMes(i); carouselTrack.appendChild(div);
+    });
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        document.getElementById('btn-tab-' + tabId).classList.add('active');
+    }
+
+    function getDiasArray(startIdx) {
+        const base =["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+        let res =[];
+        for(let i=0; i<7; i++) { res.push(base[(startIdx + i) % 7]); }
+        return res;
+    }
+
+    function cambiarTipoDiseno(regenerar = true) {
+        let tipo = document.getElementById('tipo-diseno').value;
+        let cont = document.getElementById('calendario-contenedor');
+        if (tipo === 'caratula') {
+            document.getElementById('grupo-calendario-opts').style.display = 'none';
+            document.getElementById('grupo-caratula-opts').style.display = 'flex';
+            cont.classList.add('modo-caratula');
+        } else {
+            document.getElementById('grupo-calendario-opts').style.display = 'flex';
+            document.getElementById('grupo-caratula-opts').style.display = 'none';
+            cont.classList.remove('modo-caratula');
+        }
+        if(regenerar) {
+            guardarEstadoMesActual();
+            generarCuadricula(); 
+        }
+    }
+
+    function actualizarTextosCaratula() {
+        document.getElementById('cara-render-materia').innerText = document.getElementById('cara-input-materia').value;
+        let nom = document.getElementById('cara-input-nombre').value;
+        let cur = document.getElementById('cara-input-curso').value;
+        
+        let datosBox = document.getElementById('cara-render-datos');
+        let nomLine = document.getElementById('cara-render-nombre');
+        let curLine = document.getElementById('cara-render-curso');
+        
+        if (!nom && !cur) {
+            datosBox.style.display = 'none';
+        } else {
+            datosBox.style.display = 'flex';
+            nomLine.innerText = nom ? `Alumno/a: ${nom}` : '';
+            curLine.innerText = cur ? `Curso: ${cur}` : '';
+            nomLine.style.display = nom ? 'block' : 'none';
+            curLine.style.display = cur ? 'block' : 'none';
+        }
+        guardarEstadoMesActual();
+    }
+
+    function actualizarInicioSemana() { guardarEstadoMesActual(); generarCuadricula(); }
+    
+    function actualizarBgPos() {
+        const posX = document.getElementById('bg-pos-x').value;
+        const posY = document.getElementById('bg-pos-y').value;
+        const zoom = document.getElementById('bg-zoom').value;
+        const cont = document.getElementById('calendario-contenedor');
+        
+        cont.style.backgroundPosition = `${posX}% ${posY}%`;
+        
+        if (zoom === "100") {
+            cont.style.backgroundSize = `cover`;
+        } else {
+            cont.style.backgroundSize = `${zoom}%`;
+        }
+        guardarEstadoMesActual();
+    }
+
+    function saveColorState() {
+        let currentState = {
+            dias: document.getElementById('color-dias').value, findes: document.getElementById('color-findes').value,
+            bordes: document.getElementById('color-bordes').value, texto: document.getElementById('color-texto').value,
+            opacidad: document.getElementById('op-dias').value
+        };
+        if (colorHistory.length > 0) {
+            let last = colorHistory[colorHistory.length - 1];
+            if (last.dias === currentState.dias && last.findes === currentState.findes && last.bordes === currentState.bordes && last.texto === currentState.texto && last.opacidad === currentState.opacidad) return;
+        }
+        colorHistory.push(currentState); if (colorHistory.length > 30) colorHistory.shift();
+        document.getElementById('btn-undo-color').disabled = false;
+    }
+
+    function undoColor() {
+        if (colorHistory.length > 0) {
+            let state = colorHistory.pop();
+            let currentStr = document.getElementById('color-dias').value + document.getElementById('color-findes').value + document.getElementById('color-bordes').value + document.getElementById('color-texto').value + document.getElementById('op-dias').value;
+            let stateStr = state.dias + state.findes + state.bordes + state.texto + state.opacidad;
+            if (currentStr === stateStr && colorHistory.length > 0) { state = colorHistory.pop(); }
+            document.getElementById('color-dias').value = state.dias; document.getElementById('color-findes').value = state.findes;
+            document.getElementById('color-bordes').value = state.bordes; document.getElementById('color-texto').value = state.texto;
+            document.getElementById('op-dias').value = state.opacidad;
+            actualizarColores();
+        }
+        if (colorHistory.length === 0) { document.getElementById('btn-undo-color').disabled = true; }
+    }
+
+    // Novedad: Si isLoadingMonth es TRUE, bloqueamos el guardado. 
+    function guardarEstadoMesActual() {
+        if (!isInitialized || currentMes === -1 || isLoadingMonth) return;
+        
+        let m = monthStates[currentMes];
+        
+        m.anio = document.getElementById('anio').value;
+        m.tipoDiseno = document.getElementById('tipo-diseno').value;
+        m.caratulaMateria = document.getElementById('cara-input-materia').value;
+        m.caratulaNombre = document.getElementById('cara-input-nombre').value;
+        m.caratulaCurso = document.getElementById('cara-input-curso').value;
+        
+        m.tamanoPapel = document.getElementById('tamano-papel').value;
+        m.originalRatio = originalImageRatio;
+        
+        m.bgUrl = document.getElementById('calendario-contenedor').style.backgroundImage;
+        m.bgPosX = document.getElementById('bg-pos-x').value;
+        m.bgPosY = document.getElementById('bg-pos-y').value;
+        m.bgZoom = document.getElementById('bg-zoom').value;
+        m.inicioSemana = document.getElementById('inicio-semana').value;
+        
+        m.colorDias = document.getElementById('color-dias').value; 
+        m.colorFindes = document.getElementById('color-findes').value;
+        m.colorBordes = document.getElementById('color-bordes').value; 
+        m.colorTexto = document.getElementById('color-texto').value;
+        m.opacidad = document.getElementById('op-dias').value; 
+        
+        m.estilo = document.getElementById('estilo-calendario').value;
+        m.textoLogo = document.getElementById('texto-logo').value; 
+        m.textoPersonaje = document.getElementById('texto-personaje').value;
+        
+        m.paletaColors =[...currentPalette]; 
+        m.notas = Array.from(document.querySelectorAll('.notas')).map(ta => ta.value);
+        
+        layers.forEach(l => {
+            let el = document.getElementById(l.id);
+            if (el) { l.left = el.style.left; l.top = el.style.top; l.width = el.style.width; l.height = el.style.height;
+                let inner = el.querySelector('.sticker-inner'); if (inner) l.transform = inner.style.transform;
+            }
+        });
+        m.layers = JSON.parse(JSON.stringify(layers)); 
+    }
+
+    // Novedad: Bloqueo activo al inyectar valores para evitar contaminación de estados cruzados
+    function cargarEstadoMes(index) {
+        isLoadingMonth = true; // ⛔ CONGELAMOS EL GUARDADO 
+        colorHistory =[]; document.getElementById('btn-undo-color').disabled = true;
+        let m = monthStates[index];
+        
+        // --- TEXTOS E INPUTS DOM ---
+        document.getElementById('anio').value = m.anio;
+        
+        document.getElementById('tipo-diseno').value = m.tipoDiseno || 'calendario';
+        document.getElementById('cara-input-materia').value = m.caratulaMateria || 'MATEMÁTICA';
+        document.getElementById('cara-input-nombre').value = m.caratulaNombre || '';
+        document.getElementById('cara-input-curso').value = m.caratulaCurso || '';
+        
+        document.getElementById('tamano-papel').value = m.tamanoPapel || 'auto';
+        document.getElementById('inicio-semana').value = m.inicioSemana || '1';
+        document.getElementById('estilo-calendario').value = m.estilo;
+        
+        document.getElementById('bg-pos-x').value = m.bgPosX || '50';
+        document.getElementById('bg-pos-y').value = m.bgPosY || '50';
+        document.getElementById('bg-zoom').value = m.bgZoom || '100';
+
+        document.getElementById('color-dias').value = m.colorDias; 
+        document.getElementById('color-findes').value = m.colorFindes;
+        document.getElementById('color-bordes').value = m.colorBordes; 
+        document.getElementById('color-texto').value = m.colorTexto;
+        document.getElementById('op-dias').value = m.opacidad; 
+        
+        document.getElementById('texto-logo').value = m.textoLogo; 
+        document.getElementById('texto-personaje').value = m.textoPersonaje;
+        document.getElementById('imagen-fondo').value = '';
+
+        // --- BACKGROUND ---
+        originalImageRatio = m.originalRatio || null; 
+        const cont = document.getElementById('calendario-contenedor');
+        cont.style.backgroundImage = m.bgUrl || '';
+        cont.style.backgroundPosition = `${m.bgPosX || '50'}% ${m.bgPosY || '50'}%`;
+        if ((m.bgZoom || '100') === "100") {
+            cont.style.backgroundSize = 'cover';
+        } else {
+            cont.style.backgroundSize = `${m.bgZoom}%`;
+        }
+
+        // --- APLICAR FUNCIONES VISUALES (que antes guardaban a medias por error) ---
+        cambiarTipoDiseno(false);
+        actualizarTextosCaratula();
+        currentPalette =[...m.paletaColors]; 
+        renderPalette(); 
+        actualizarColores(); 
+        actualizarProporcionPapel(); 
+        cambiarEstiloUI(false, false); 
+        generarCuadricula(); 
+
+        // --- RESTAURAR NOTAS ---
+        let textareas = document.querySelectorAll('.notas'); 
+        m.notas.forEach((nota, i) => { if (textareas[i]) textareas[i].value = nota; });
+        
+        // --- RESTAURAR STICKERS Y CAPAS ---
+        document.querySelectorAll('.sticker-wrapper').forEach(el => el.remove()); 
+        layers = JSON.parse(JSON.stringify(m.layers));
+        layers.forEach(l => crearStickerDOM(l)); 
+        renderLayerStack(); 
+        setActiveLayer(null);
+
+        isLoadingMonth = false; // ✅ DESCONGELAMOS EL GUARDADO, 100% CARGADO Y SEGURO
+    }
+
+    function seleccionarMes(index) {
+        guardarEstadoMesActual(); 
+        currentMes = index;
+        document.querySelectorAll('.month-item').forEach(el => el.classList.remove('active'));
+        const activeBtn = document.getElementById(`month-btn-${index}`);
+        activeBtn.classList.add('active'); 
+        activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        cargarEstadoMes(index); 
+        isInitialized = true;
+    }
+
+    function actualizarMesDesdeCarrusel() { guardarEstadoMesActual(); generarCuadricula(); }
+
+    function cambiarEstiloUI(regenerate = true, autoCenter = false) {
+        const estilo = document.getElementById('estilo-calendario').value;
+        const cont = document.getElementById('calendario-contenedor');
+        
+        document.getElementById('grupo-textos-extra').style.display = (estilo === 'clasico') ? 'flex' : 'none';
+        document.getElementById('grupo-bg-pos').style.display = (estilo === 'escritorio') ? 'flex' : 'none';
+        
+        const isVertical = cont.classList.contains('modo-vertical');
+        
+        cont.classList.remove('tema-moderno', 'tema-clasico', 'tema-lineal', 'tema-escritorio');
+        cont.classList.add('tema-' + estilo);
+        if (isVertical) {
+            cont.classList.add('modo-vertical');
+        }
+
+        if (autoCenter) {
+            document.getElementById('bg-pos-x').value = '50';
+            document.getElementById('bg-pos-y').value = '50';
+            document.getElementById('bg-zoom').value = '100';
+            cont.style.backgroundPosition = '50% 50%';
+            cont.style.backgroundSize = 'cover';
+        }
+        
+        if (estilo === 'escritorio') { 
+            validarColorTexto(); actualizarColores();
+        }
+        
+        if (regenerate) generarCuadricula();
+        guardarEstadoMesActual();
+    }
+
+    function actualizarTextos() {
+        document.getElementById('hc-logo').innerHTML = document.getElementById('texto-logo').value.replace(/\n/g, '<br>');
+        document.getElementById('hc-char').innerText = document.getElementById('texto-personaje').value;
+        guardarEstadoMesActual();
+    }
+    
+    function actualizarProporcionPapel() {
+        const val = document.getElementById('tamano-papel').value;
+        const cont = document.getElementById('calendario-contenedor');
+        let ratioValue = 16 / 9; 
+        
+        if (val === 'auto' && originalImageRatio) { 
+            cont.style.aspectRatio = originalImageRatio; 
+            let parts = originalImageRatio.split('/');
+            if (parts.length === 2) {
+                ratioValue = parseFloat(parts[0]) / parseFloat(parts[1]);
+            }
+        } 
+        else if (formatosPapel[val]) { 
+            cont.style.aspectRatio = formatosPapel[val].ratio; 
+            ratioValue = formatosPapel[val].ratio;
+        } else {
+            cont.style.aspectRatio = "16 / 9";
+        }
+        
+        if (ratioValue <= 1) {
+            cont.classList.add('modo-vertical');
+        } else {
+            cont.classList.remove('modo-vertical');
+        }
+        
+        guardarEstadoMesActual(); 
+    }
+
+    function hexToRgb(hex) { let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : "255, 255, 255"; }
+    function rgbToHex(r, g, b) { return "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1); }
+
+    function hexToHsl(hex) {
+        let r = parseInt(hex.substring(1,3), 16) / 255, g = parseInt(hex.substring(3,5), 16) / 255, b = parseInt(hex.substring(5,7), 16) / 255;
+        let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin, h = 0, s = 0, l = 0;
+        if (delta == 0) h = 0; else if (cmax == r) h = ((g - b) / delta) % 6; else if (cmax == g) h = (b - r) / delta + 2; else h = (r - g) / delta + 4;
+        h = Math.round(h * 60); if (h < 0) h += 360; l = (cmax + cmin) / 2; s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1)); return[h, +(s * 100).toFixed(1), +(l * 100).toFixed(1)];
+    }
+
+    function hslToHex(h, s, l) {
+        s /= 100; l /= 100; let c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c/2, r = 0, g = 0, b = 0;
+        if (0 <= h && h < 60) { r = c; g = x; b = 0; } else if (60 <= h && h < 120) { r = x; g = c; b = 0; } else if (120 <= h && h < 180) { r = 0; g = c; b = x; } else if (180 <= h && h < 240) { r = 0; g = x; b = c; } else if (240 <= h && h < 300) { r = x; g = 0; b = c; } else if (300 <= h && h <= 360) { r = c; g = 0; b = x; }
+        r = Math.round((r + m) * 255).toString(16).padStart(2, '0'); g = Math.round((g + m) * 255).toString(16).padStart(2, '0'); b = Math.round((b + m) * 255).toString(16).padStart(2, '0'); return `#${r}${g}${b}`;
+    }
+
+    function getComplementary(hex) { let[h, s, l] = hexToHsl(hex); return hslToHex((h + 180) % 360, s, l); }
+    function getContrast(hex) { let[h, s, l] = hexToHsl(hex); let lContrast = l > 50 ? Math.max(0, l - 60) : Math.min(100, l + 60); return hslToHex(h, Math.max(0, s - 30), lContrast); }
+    function isDarkColor(hex) { let r = parseInt(hex.substring(1,3), 16), g = parseInt(hex.substring(3,5), 16), b = parseInt(hex.substring(5,7), 16); return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 128; }
+
+    function validarColorTexto() {
+        let estilo = document.getElementById('estilo-calendario').value;
+        let colorTextoInput = document.getElementById('color-texto');
+        if (estilo === 'escritorio' && colorTextoInput.value.toLowerCase() === '#ffffff') {
+            colorTextoInput.value = '#111111';
+            alert("⚠️ El color blanco en la letra no está permitido en el modo Escritorio debido a su fondo claro.");
+        }
+    }
+
+    function actualizarColores() {
+        validarColorTexto();
+        const root = document.documentElement;
+        root.style.setProperty('--bg-dias', hexToRgb(document.getElementById('color-dias').value));
+        root.style.setProperty('--bg-findes', hexToRgb(document.getElementById('color-findes').value));
+        root.style.setProperty('--border-dias', document.getElementById('color-bordes').value);
+        root.style.setProperty('--color-texto', document.getElementById('color-texto').value);
+        root.style.setProperty('--opacidad-dias', document.getElementById('op-dias').value);
+        root.style.setProperty('--opacidad-findes', document.getElementById('op-dias').value);
+        root.style.setProperty('--color-secundario', document.getElementById('color-dias').value);
+        guardarEstadoMesActual();
+    }
+
+    function renderPalette() {
+        const paletaContenedor = document.getElementById('paleta'); paletaContenedor.innerHTML = '';
+        if (currentPalette.length === 0) { paletaContenedor.innerHTML = '<span style="color:#888; font-size:0.85em; padding: 5px;">Sube un fondo para extraer paleta...</span>'; return; }
+        currentPalette.forEach(hex => {
+            const swatch = document.createElement('div'); swatch.className = 'color-swatch'; swatch.style.background = hex; swatch.title = "Aplicar como color base";
+            swatch.onclick = () => aplicarColoresInteligentes(hex); paletaContenedor.appendChild(swatch);
+        });
+    }
+
+    function aplicarColoresInteligentes(baseHex) {
+        saveColorState();
+        document.getElementById('color-dias').value = baseHex;
+        document.getElementById('color-findes').value = getComplementary(baseHex);
+        document.getElementById('color-bordes').value = getContrast(baseHex);
+        
+        let autoText = isDarkColor(baseHex) ? '#ffffff' : '#111111';
+        let estilo = document.getElementById('estilo-calendario').value;
+        if (estilo === 'escritorio' && autoText === '#ffffff') autoText = '#111111';
+        document.getElementById('color-texto').value = autoText;
+        
+        actualizarColores();
+    }
+
+    document.getElementById('imagen-fondo').addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            const url = URL.createObjectURL(e.target.files[0]);
+            const cont = document.getElementById('calendario-contenedor');
+            cont.style.backgroundImage = `url(${url})`;
+            
+            document.getElementById('bg-pos-x').value = '50';
+            document.getElementById('bg-pos-y').value = '50';
+            document.getElementById('bg-zoom').value = '100';
+            cont.style.backgroundPosition = '50% 50%';
+            cont.style.backgroundSize = 'cover';
+            
+            const img = document.getElementById('imagen-oculta');
+            img.onload = function() {
+                originalImageRatio = `${img.naturalWidth} / ${img.naturalHeight}`; 
+                actualizarProporcionPapel(); 
+                try {
+                    const paletaC = colorThief.getPalette(img, 5);
+                    currentPalette = paletaC.map(color => rgbToHex(color[0], color[1], color[2]));
+                    renderPalette(); aplicarColoresInteligentes(currentPalette[0]); 
+                } catch(e) {}
+                guardarEstadoMesActual(); 
+            }; 
+            img.src = url;
+        }
+    });
+
+    function generarMiniCuadricula(prefix, offset, currentAnio) {
+        let date = new Date(currentAnio, currentMes + offset, 1);
+        let m = date.getMonth(), y = date.getFullYear();
+        document.getElementById(prefix + '-title').innerText = `${meses[m]} ${y}`.toUpperCase();
+        let grid = document.getElementById(prefix); grid.innerHTML = '';
+        
+        let startIdx = parseInt(document.getElementById('inicio-semana').value);
+        let diasOrder = getDiasArray(startIdx);
+        diasOrder.forEach((diaStr, index) => {
+            let div = document.createElement('div'); div.className = 'mg-header'; div.innerText = diaStr[0];
+            let actualDay = (startIdx + index) % 7;
+            if (actualDay === 0) div.classList.add('mg-dom'); if (actualDay === 6) div.classList.add('mg-sab'); 
+            grid.appendChild(div);
+        });
+        
+        const primerDia = date.getDay(); 
+        const primerDiaShifted = (primerDia - startIdx + 7) % 7;
+        const diasEnMes = new Date(y, m + 1, 0).getDate();
+        const total = Math.ceil((primerDiaShifted + diasEnMes) / 7) * 7;
+        
+        for (let i = 0; i < total; i++) {
+            let celda = document.createElement('div');
+            let num = i - primerDiaShifted + 1;
+            if (num > 0 && num <= diasEnMes) {
+                celda.innerText = num; 
+                let col = i % 7; let actualDay = (startIdx + col) % 7;
+                if(actualDay === 0) celda.classList.add('mg-dom'); else if(actualDay === 6) celda.classList.add('mg-sab');
+            }
+            grid.appendChild(celda);
+        }
+    }
+
+    function generarCuadricula() {
+        const anio = parseInt(document.getElementById('anio').value), estilo = document.getElementById('estilo-calendario').value;
+        document.getElementById('titulo-mes-moderno').innerText = `${meses[currentMes]} ${anio}`;
+        document.getElementById('hc-num').innerText = (currentMes + 1).toString().padStart(2, '0');
+        document.getElementById('hc-mes').innerText = mesesIngles[currentMes]; document.getElementById('hc-anio').innerText = anio;
+        actualizarTextos();
+        
+        const primerDia = new Date(anio, currentMes, 1).getDay();
+        let startIdx = parseInt(document.getElementById('inicio-semana').value);
+        const primerDiaShifted = (primerDia - startIdx + 7) % 7;
+        const diasEnMes = new Date(anio, currentMes + 1, 0).getDate();
+        
+        if (estilo === 'lineal') {
+            document.getElementById('lc-month').innerText = currentMes + 1; document.getElementById('lc-year').innerText = anio;
+            const lcDays = document.getElementById('lc-days'); lcDays.innerHTML = '';
+            for (let i = 1; i <= diasEnMes; i++) {
+                let dayOfWeek = new Date(anio, currentMes, i).getDay(); let span = document.createElement('span'); span.innerText = i;
+                if (dayOfWeek === 0) span.classList.add('domingo'); else if (dayOfWeek === 6) span.classList.add('sabado'); else span.classList.add('normal');
+                lcDays.appendChild(span);
+            }
+        } else {
+            const cuadricula = document.getElementById('cuadricula-dias'); cuadricula.innerHTML = '';
+            let diasOrder = getDiasArray(startIdx);
+            diasOrder.forEach((diaStr, index) => {
+                let div = document.createElement('div'); div.className = 'dia-nombre'; div.innerText = diaStr;
+                let actualDay = (startIdx + index) % 7;
+                if (actualDay === 0) div.classList.add('dom'); else if (actualDay === 6) div.classList.add('sab'); else div.classList.add('normal');
+                cuadricula.appendChild(div);
+            });
+            
+            const filas = Math.ceil((primerDiaShifted + diasEnMes) / 7);
+            
+            cuadricula.style.gridTemplateRows = `max-content repeat(${filas}, 1fr)`;
+            
+            let totalCeldas = filas * 7; 
+            for (let i = 0; i < totalCeldas; i++) {
+                let celda = document.createElement('div'); celda.className = 'dia-celda';
+                let col = i % 7; let actualDay = (startIdx + col) % 7;
+                if (actualDay === 0) celda.classList.add('finde', 'dom'); else if (actualDay === 6) celda.classList.add('finde', 'sab'); else celda.classList.add('normal');
+                
+                let numeroDia = i - primerDiaShifted + 1;
+                if (numeroDia > 0 && numeroDia <= diasEnMes) { celda.innerHTML = `<span class="dia-numero">${numeroDia}</span><textarea class="notas" placeholder="Anotaciones..." oninput="guardarEstadoMesActual()"></textarea>`; } 
+                else { celda.classList.add('vacia'); celda.innerHTML = `<textarea class="notas" oninput="guardarEstadoMesActual()"></textarea>`; }
+                cuadricula.appendChild(celda);
+            }
+        }
+
+        if (estilo === 'escritorio') {
+            document.getElementById('eh-texto').innerText = `${meses[currentMes]} ${anio}`.toUpperCase();
+            generarMiniCuadricula('mini-prev', -1, anio);
+            generarMiniCuadricula('mini-next', 1, anio);
+        }
+    }
+
+    // ================= CAPAS, STICKERS Y EMOJIS =================
+    
+    function generarBordeCanvas(srcOriginal, thickness, callback) {
+        thickness = parseInt(thickness); if (thickness <= 0) { callback(srcOriginal); return; }
+        let img = new Image(); img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            let canvas = document.createElement('canvas'); canvas.width = img.width + (thickness * 2); canvas.height = img.height + (thickness * 2); let ctx = canvas.getContext('2d');
+            let silCanvas = document.createElement('canvas'); silCanvas.width = canvas.width; silCanvas.height = canvas.height; let silCtx = silCanvas.getContext('2d');
+            silCtx.drawImage(img, thickness, thickness); silCtx.globalCompositeOperation = 'source-in'; silCtx.fillStyle = "white"; silCtx.fillRect(0, 0, silCanvas.width, silCanvas.height);
+            let radius = thickness, steps = Math.max(24, Math.floor(2 * Math.PI * radius)); ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < steps; i++) { let angle = (i * 2 * Math.PI) / steps, x = thickness + Math.cos(angle) * radius, y = thickness + Math.sin(angle) * radius; ctx.drawImage(silCanvas, x - thickness, y - thickness); }
+            ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(img, thickness, thickness); callback(canvas.toDataURL("image/png"));
+        }; img.src = srcOriginal;
+    }
+
+    document.getElementById('calendario-contenedor').addEventListener('mousedown', function(e) { if(e.target === this || e.target.id === 'escritorio-bg' || e.target.id === 'caratula-container' || e.target.classList.contains('cuadricula') || e.target.classList.contains('dia-celda')) setActiveLayer(null); });
+
+    document.getElementById('add-sticker-input').addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            const url = URL.createObjectURL(e.target.files[0]); const newId = 'stk_' + Date.now();
+            let maxZ = Z_GRID + 1; layers.forEach(l => { if(l.zIndex >= maxZ) maxZ = l.zIndex + 1; });
+            const newLayer = { id: newId, type: 'image', name: `Capa ${layers.length + 1}`, src: url, originalSrc: url, zIndex: maxZ, opacity: 1, border: 0, flipH: 1, flipV: 1, rot: 0, visible: true, left: '35%', top: '35%', width: '15cqi', height: '15cqi', transform: 'none' };
+            layers.push(newLayer); crearStickerDOM(newLayer); renderLayerStack(); setActiveLayer(newId); e.target.value = "";
+            guardarEstadoMesActual();
+        }
+    });
+
+    async function addEmojiSticker() {
+        const input = document.getElementById('emoji-input'), emojiText = input.value.trim();
+        if(!emojiText) return; input.disabled = true; try { await document.fonts.load('300px "Noto Color Emoji"'); } catch(e) { console.log(e); }
+        const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 400; const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, 400, 400); ctx.font = '300px "Noto Color Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(emojiText, 200, 220); 
+        const url = canvas.toDataURL("image/png"); const newId = 'stk_' + Date.now();
+        let maxZ = Z_GRID + 1; layers.forEach(l => { if(l.zIndex >= maxZ) maxZ = l.zIndex + 1; });
+        const newLayer = { id: newId, type: 'emoji', content: emojiText, name: `Emoji ${emojiText}`, src: url, originalSrc: url, zIndex: maxZ, opacity: 1, border: 0, flipH: 1, flipV: 1, rot: 0, visible: true, left: '35%', top: '35%', width: '15cqi', height: '15cqi', transform: 'none' };
+        layers.push(newLayer); crearStickerDOM(newLayer); renderLayerStack(); setActiveLayer(newId); input.value = ""; input.disabled = false;
+        guardarEstadoMesActual();
+    }
+
+    function crearStickerDOM(layer) {
+        const cont = document.getElementById('calendario-contenedor'); const wrapper = document.createElement('div'); wrapper.className = 'sticker-wrapper'; wrapper.id = layer.id; wrapper.style.left = layer.left; wrapper.style.top = layer.top; wrapper.style.width = layer.width; wrapper.style.height = layer.height; wrapper.style.zIndex = layer.zIndex; wrapper.style.opacity = layer.opacity; wrapper.style.display = layer.visible ? 'flex' : 'none';
+        wrapper.innerHTML = `<div class="sticker-inner" id="inner_${layer.id}" style="transform: ${layer.transform || 'none'};"><img src="${layer.src}" class="sticker-img" style="transform: scaleX(${layer.flipH}) scaleY(${layer.flipV});"></div><div class="transform-controls"><div class="rotate-line"></div><div class="rotate-handle" title="Arrastra para Rotar"></div><div class="resize-handle" title="Arrastra para Escalar"></div></div>`;
+        wrapper.addEventListener('mousedown', () => setActiveLayer(layer.id)); setupInteract(wrapper, layer.id); cont.appendChild(wrapper);
+    }
+
+    function setupInteract(wrapper, id) {
+        const resizeH = wrapper.querySelector('.resize-handle'), rotateH = wrapper.querySelector('.rotate-handle'), inner = wrapper.querySelector('.sticker-inner');
+        let mode = null; let startX, startY, startW, startH, startLeft, startTop, centerX, centerY;
+        wrapper.addEventListener('mousedown', function(e) { if(e.target === resizeH) { mode = 'resize'; startW = wrapper.offsetWidth; startH = wrapper.offsetHeight; } else if(e.target === rotateH) { mode = 'rotate'; let rect = wrapper.getBoundingClientRect(); centerX = rect.left + rect.width / 2; centerY = rect.top + rect.height / 2; } else { mode = 'drag'; startLeft = wrapper.offsetLeft; startTop = wrapper.offsetTop; } startX = e.clientX; startY = e.clientY; e.stopPropagation(); e.preventDefault(); });
+        document.addEventListener('mousemove', function(e) { if (!mode) return; if (mode === 'resize') { const delta = e.clientX - startX; wrapper.style.width = Math.max(50, startW + delta) + 'px'; wrapper.style.height = Math.max(50, startH + (delta * (startH/startW))) + 'px'; } else if (mode === 'drag') { wrapper.style.left = (startLeft + (e.clientX - startX)) + 'px'; wrapper.style.top = (startTop + (e.clientY - startY)) + 'px'; } else if (mode === 'rotate') { let angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI; inner.style.transform = `rotate(${angle + 90}deg)`; } });
+        document.addEventListener('mouseup', function() { if(mode) { mode = null; guardarEstadoMesActual(); } });
+    }
+
+    function renderLayerStack() {
+        const stack = document.getElementById('layer-stack'); stack.innerHTML = '';
+        let sortedLayers =[...layers].sort((a,b) => b.zIndex - a.zIndex); let gridInserted = false;
+        sortedLayers.forEach((l) => {
+            if(!gridInserted && l.zIndex < Z_GRID) { stack.innerHTML += `<div class="layer-item grid-layer">--- ELEMENTOS FIJOS ---</div>`; gridInserted = true; }
+            const div = document.createElement('div'); div.className = `layer-item ${activeLayerId === l.id ? 'active' : ''}`; div.style.opacity = l.visible ? '1' : '0.5'; div.onclick = () => setActiveLayer(l.id);
+            const thumbContent = l.type === 'emoji' ? l.content : `<img src="${l.src}" class="layer-thumb" style="margin:0">`;
+            div.innerHTML = `<div class="layer-thumb">${thumbContent}</div><span class="layer-name">${l.name}</span><div class="layer-actions" onclick="event.stopPropagation()"><button class="layer-btn" title="Mostrar/Ocultar" onclick="toggleVisibility('${l.id}')">${l.visible ? '👁️' : '🙈'}</button><button class="layer-btn" onclick="moveLayer('${l.id}', 1)">▲</button><button class="layer-btn" onclick="moveLayer('${l.id}', -1)">▼</button><button class="layer-btn delete" onclick="deleteLayer('${l.id}')">✖</button></div>`;
+            stack.appendChild(div);
+        });
+        if(!gridInserted) { stack.innerHTML += `<div class="layer-item grid-layer">--- ELEMENTOS FIJOS ---</div>`; }
+    }
+
+    function toggleVisibility(id) { const layer = layers.find(l => l.id === id); layer.visible = !layer.visible; document.getElementById(id).style.display = layer.visible ? 'flex' : 'none'; renderLayerStack(); guardarEstadoMesActual(); }
+    function setActiveLayer(id) { activeLayerId = id; document.querySelectorAll('.sticker-wrapper').forEach(el => el.classList.remove('active')); if(id) { let el = document.getElementById(id); if(el) el.classList.add('active'); } renderLayerStack(); const props = document.getElementById('layer-props'); if(!id) { props.classList.remove('visible'); return; } props.classList.add('visible'); const layer = layers.find(l => l.id === id); document.getElementById('prop-border').value = layer.border; document.getElementById('prop-opac').value = layer.opacity; }
+    function moveLayer(id, direction) { const layer = layers.find(l => l.id === id); if(!layer) return; layer.zIndex += direction * 2; if(layer.zIndex === Z_GRID) layer.zIndex += direction; document.getElementById(id).style.zIndex = layer.zIndex; renderLayerStack(); guardarEstadoMesActual(); }
+    function deleteLayer(id) { document.getElementById(id).remove(); layers = layers.filter(l => l.id !== id); if(activeLayerId === id) setActiveLayer(null); else renderLayerStack(); guardarEstadoMesActual(); }
+
+    function updateActiveSticker(prop, value) {
+        if(!activeLayerId) return; const layer = layers.find(l => l.id === activeLayerId); layer[prop] = value; const wrapper = document.getElementById(activeLayerId);
+        if(prop === 'opacity') { wrapper.style.opacity = value; guardarEstadoMesActual(); }
+        if(prop === 'border') { clearTimeout(layer.borderTimer); layer.borderTimer = setTimeout(() => { generarBordeCanvas(layer.originalSrc, value, (nuevaImagen) => { layer.src = nuevaImagen; wrapper.querySelector('.sticker-img').src = nuevaImagen; renderLayerStack(); guardarEstadoMesActual(); }); }, 100); }
+    }
+
+    function toggleStickerFlip(prop) { if(!activeLayerId) return; const layer = layers.find(l => l.id === activeLayerId); layer[prop] = layer[prop] === 1 ? -1 : 1; document.getElementById(activeLayerId).querySelector('.sticker-img').style.transform = `scaleX(${layer.flipH}) scaleY(${layer.flipV})`; guardarEstadoMesActual(); }
+
+    function quitarMarcaAgua() {
+        if(!activeLayerId) return; const layer = layers.find(l => l.id === activeLayerId); if (layer.type === 'emoji') { alert("No es necesario quitar marca de agua en Emojis."); return; }
+        const btn = event.target || document.querySelector('button[onclick="quitarMarcaAgua()"]'); const oldText = btn.innerText; btn.innerText = "⏳ Procesando Borrado Inteligente..."; btn.disabled = true;
+        const img = new Image(); img.crossOrigin = "Anonymous";
+        img.onload = () => {
+            setTimeout(() => {
+                const canvas = document.createElement('canvas'); const w = img.width, h = img.height; canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const imageData = ctx.getImageData(0, 0, w, h), data = imageData.data;
+                let mask = new Uint8Array(w * h); for (let i = 0; i < data.length; i += 4) { let r = data[i], g = data[i+1], b = data[i+2], a = data[i+3]; if (a > 10 && a < 245 && r > 160 && g > 160 && b > 160) { let max = Math.max(r, g, b), min = Math.min(r, g, b); if (max - min < 30) mask[i/4] = 1; } }
+                let maskDilated = new Uint8Array(w * h); for (let y = 1; y < h - 1; y++) { for (let x = 1; x < w - 1; x++) { let idx = y * w + x; if (mask[idx] === 1) { maskDilated[idx] = 1; maskDilated[idx-1] = 1; maskDilated[idx+1] = 1; maskDilated[idx-w] = 1; maskDilated[idx+w] = 1; maskDilated[idx-w-1] = 1; maskDilated[idx-w+1] = 1; maskDilated[idx+w-1] = 1; maskDilated[idx+w+1] = 1; } } }
+                for (let iter = 0; iter < 30; iter++) { let newData = new Uint8ClampedArray(data), pendientes = 0; for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) { let idx = y * w + x; if (maskDilated[idx] === 1) { pendientes++; let rSum = 0, gSum = 0, bSum = 0, aSum = 0, count = 0; for (let dy = -2; dy <= 2; dy++) { for (let dx = -2; dx <= 2; dx++) { let nx = x + dx, ny = y + dy; if (nx >= 0 && nx < w && ny >= 0 && ny < h) { let nIdx = ny * w + nx; if (maskDilated[nIdx] === 0) { let pIdx = nIdx * 4; rSum += data[pIdx]; gSum += data[pIdx+1]; bSum += data[pIdx+2]; aSum += data[pIdx+3]; count++; } } } } if (count > 0) { let pIdx = idx * 4; newData[pIdx] = rSum / count; newData[pIdx+1] = gSum / count; newData[pIdx+2] = bSum / count; newData[pIdx+3] = aSum / count; maskDilated[idx] = 2; } } } } data.set(newData); for(let i=0; i<maskDilated.length; i++) { if(maskDilated[i] === 2) maskDilated[i] = 0; } if (pendientes === 0) break; }
+                ctx.putImageData(imageData, 0, 0); const nuevaImagen = canvas.toDataURL("image/png"); layer.src = nuevaImagen; document.getElementById(activeLayerId).querySelector('.sticker-img').src = nuevaImagen; renderLayerStack(); btn.innerText = oldText; btn.disabled = false; guardarEstadoMesActual();
+            }, 50); 
+        }; img.src = layer.src;
+    }
+
+    // ================= EXPORTACION =================
+    function prepararCanvasCORS() { setActiveLayer(null); document.querySelectorAll('.notas').forEach(ta => { if(!ta.value) ta.placeholder = ""; }); }
+    function restaurarCanvasCORS() { document.querySelectorAll('.notas').forEach(ta => { if(!ta.value) ta.placeholder = "Anotaciones..."; }); }
+
+    function guardarMesEnZip() {
+        const mesTxt = meses[currentMes];
+        const anio = document.getElementById('anio').value; 
+        const m = monthStates[currentMes];
+        const isCaratula = m.tipoDiseno === 'caratula';
+        
+        let nombreMateriaFiltrado = (m.caratulaMateria || 'Materia').replace(/[^a-z0-9]/gi, '_');
+        const fileName = isCaratula ? `Caratula_${nombreMateriaFiltrado}_${mesTxt}.jpg` : `Calendario_${mesTxt}_${anio}.jpg`;
+
+        prepararCanvasCORS();
+        html2canvas(document.getElementById('calendario-contenedor'), { scale: 2, useCORS: true }).then(canvas => { 
+            zip.file(fileName, canvas.toDataURL("image/jpeg", 0.95).split(',')[1], {base64: true}); 
+            restaurarCanvasCORS(); 
+            alert(`${isCaratula ? 'Carátula de ' + m.caratulaMateria : 'Imagen de ' + mesTxt} añadida al ZIP.`); 
+        });
+    }
+    function descargarZip() { if(Object.keys(zip.files).length === 0) return alert("Añade elementos al ZIP primero."); zip.generateAsync({type:"blob"}).then(content => { const link = document.createElement('a'); link.href = URL.createObjectURL(content); link.download = "Mis_Disenos.zip"; link.click(); }); }
+
+    function guardarMesEnPDF() {
+        const mesTxt = meses[currentMes], valPapel = document.getElementById('tamano-papel').value; 
+        const m = monthStates[currentMes];
+        const isCaratula = m.tipoDiseno === 'caratula';
+
+        prepararCanvasCORS();
+        html2canvas(document.getElementById('calendario-contenedor'), { scale: 2, useCORS: true }).then(canvas => {
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            let pdfOri = canvas.width > canvas.height ? 'l' : 'p', formatArr =[canvas.width, canvas.height], unit = 'px', config = formatosPapel[valPapel];
+            if (config) { pdfOri = config.pdfOri; formatArr = config.pdfFormat; unit = 'mm'; } 
+            if (!pdfInstance) pdfInstance = new jsPDF({ orientation: pdfOri, unit: unit, format: formatArr }); else pdfInstance.addPage(formatArr, pdfOri);
+            pdfInstance.addImage(imgData, 'JPEG', 0, 0, pdfInstance.internal.pageSize.getWidth(), pdfInstance.internal.pageSize.getHeight());
+            pdfPageCount++; restaurarCanvasCORS(); 
+            alert(`Página de ${isCaratula ? 'Carátula' : mesTxt} añadida al PDF (${pdfPageCount} pág).`);
+        });
+    }
+    function descargarPDF() { if(!pdfInstance) return alert("Añade hojas al PDF primero."); pdfInstance.save("Mis_Disenos.pdf"); pdfInstance = null; pdfPageCount = 0; }
+
+    // ================= PANEL DE EMOJIS PARA PC =================
+    const arrayEmojis =["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","👽","👾","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾","👋","🤚","🖐","✋","🖖","👌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦵","🦶","👂","🦻","👃","🧠","🦷","🦴","👀","👁","👅","👄","💋","🩸","🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐽","🐸","🐵","🙈","🙉","🙊","🐒","🐔","🐧","🐦","🐤","🐣","🐥","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐜","🦟","🦗","🕷","🕸","🦂","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦐","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐕‍🦺","🐈","🐓","🦃","🦚","🦜","🦢","🦩","🕊","🐇","🦝","🦨","🦡","🦦","🦥","🐁","🐀","🐿","🦔","🐾","🐉","🐲","🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶","🌽","🥕","🧄","🧅","🥔","🍠","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🦴","🌭","🍔","🍟","🍕","🥪","🥙","🧆","🌮","🌯","🥗","🥘","🥫","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪","🍤","🍙","🍚","🍘","🍥","🥠","🥮","🍢","🍡","🍧","🍨","🍦","🥧","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🌰","🥜","🍯","🥛","🍼","☕️","🍵","🧃","🥤","🍶","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾","🧊","🥄","🍴","🍽","🥣","🥡","🥢","🧂","⚽️","🏀","🏈","⚾️","🥎","🎾","🏐","🏉","🥏","🎱","🪀","🏓","🏸","🏒","🏑","🥍","🏏","🥅","⛳️","🪁","🏹","🎣","🤿","🥊","🥋","🎽","🛹","🛷","⛸","🥌","🎿","⛷","🏂","🪂","🏋️","🤼","🤸","⛹️","🤺","🤾","🏌️","🏇","🧘","🏄","🏊","🤽","🚣","🧗","🚵","🚴","🏆","🥇","🥈","🥉","🏅","🎖","🏵","🎗","🎫","🎟","🎪","🤹","🎭","🩰","🎨","🎬","🎤","🎧","🎼","🎹","🥁","🎷","🎺","🎸","🪕","🎻","🎲","♟","🎯","🎳","🎮","🎰","🧩","❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","💯","💢","💥","💫","💦","💨","🕳","💣","💬","👁️‍🗨️","🗨️","🗯️","💭","💤"];
+
+    function iniciarPanelEmojis() {
+        const esPC = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (!esPC) return;
+
+        const input = document.getElementById('emoji-input');
+        const picker = document.getElementById('emoji-picker');
+
+        arrayEmojis.forEach(em => {
+            const div = document.createElement('div');
+            div.className = 'emoji-option';
+            div.innerText = em;
+            div.onclick = function(e) {
+                e.stopPropagation();
+                input.value = em;
+                picker.classList.remove('visible');
+            };
+            picker.appendChild(div);
+        });
+
+        input.addEventListener('focus', () => picker.classList.add('visible'));
+        input.addEventListener('click', (e) => { e.stopPropagation(); picker.classList.add('visible'); });
+        
+        document.addEventListener('click', (e) => {
+            if (e.target !== input && !picker.contains(e.target)) {
+                picker.classList.remove('visible');
+            }
+        });
+    }
+
+    iniciarPanelEmojis();
+    actualizarProporcionPapel();
+    seleccionarMes(new Date().getMonth());
+
+</script>
+</body>
+</html>
